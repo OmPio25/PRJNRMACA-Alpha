@@ -1,0 +1,30 @@
+{
+  "name": "nextmitracareport",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplikasi upload, pengelolaan, dan pelaporan Data Agent, Produksi, dan Claim Settled",
+  "type": "commonjs",
+  "main": "src/server/index.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node src/server/index.js",
+    "dev": "node --watch src/server/index.js",
+    "migrate": "node db/migrate.js",
+    "seed": "node db/seed.js",
+    "reset": "node db/reset.js",
+    "test": "node --test test/",
+    "test:acceptance": "node --test test/acceptance.test.js",
+    "test:api": "node --test test/api.test.js",
+    "test:ui": "node --test test/ui-smoke.test.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

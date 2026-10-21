@@ -1,0 +1,492 @@
+Spesifikasi Fungsional dan Teknis
+Aplikasi Upload, Pengelolaan, dan Pelaporan Data Agent, Produksi, dan Claim Settled
+Versi: 1.0
+Status: Baseline Final
+Tanggal: 20 Oktober 2026
+Tujuan aplikasi
+Aplikasi digunakan untuk menerima, memvalidasi, menyimpan, mengendalikan duplikasi, memelihara histori, dan melaporkan data berikut:
+Data Agent
+Data Produksi
+Data Claim Settled
+Data upload dan audit
+Laporan produksi, polis, dan klaim
+Aplikasi harus dapat menerima upload berulang dengan nama file yang sama. Sistem tidak boleh memakai nama file sebagai dasar deduplikasi; sistem harus membandingkan isi data yang sudah dinormalisasi.
+Prinsip desain
+Prinsip | Ketentuan
+Kolom sumber | File upload menggunakan kolom baku dari data sumber yang disepakati
+Kolom aplikasi | ID internal, hash, audit, status, versi, dan relasi dibuat otomatis oleh aplikasi
+Deduplikasi | Dilakukan berdasarkan isi data setelah normalisasi, bukan nama file
+Histori | Data lama tidak dihapus; perubahan disimpan sebagai histori/versi
+Mata uang | Nominal antar-currency tidak boleh dijumlahkan langsung
+Laporan | Laporan membaca data valid sesuai aturan bisnis, bukan menjumlahkan seluruh data mentah
+Audit | Setiap data harus dapat ditelusuri sampai batch upload dan baris sumber
+
+Ruang lingkup modul
+Modul | Fungsi utama
+Upload Data | Upload file, staging, validasi, normalisasi, deduplikasi, review, dan posting
+Master Agent | Penyimpanan master agent dan mapping agent sumber ke ID internal
+Produksi | Penyimpanan transaksi/versi produksi, endorsement, dan posisi polis terkini
+Claim | Penyimpanan identitas claim dan settlement claim
+Laporan | Laporan produksi, posisi polis, settled claim, analisis agent, produk, cabang, currency, dan UW Year
+Audit | Riwayat batch, hasil validasi per baris, perubahan status, serta traceability
+Administrasi | Pengaturan pengguna, peran, master mapping, business rules, dan kurs mata uang
+
+Peran pengguna
+Peran | Hak akses utama
+Uploader | Upload file dan melihat hasil validasi batch miliknya
+Data Operations | Meninjau error, mapping, duplicate, dan batch yang memerlukan tindak lanjut
+Underwriting | Meninjau aturan produksi, endorsement, polis, produk, dan coverage
+Claims | Meninjau klasifikasi claim, settlement, koreksi, dan recovery
+Finance | Menetapkan rumus net claim dan kurs konversi resmi
+Administrator | Mengelola user, role, master data, konfigurasi, dan aturan sistem
+Auditor/Reader | Membaca laporan dan audit trail tanpa mengubah data
+
+Arsitektur proses
+Alur utama aplikasi:
+File Upload
+→ Staging
+→ Validasi Template
+→ Normalisasi Data
+→ Pembentukan Business Key dan Hash
+→ Validasi Master/Referensi
+→ Deduplikasi dan Klasifikasi
+→ Review/Approval bila diperlukan
+→ Posting ke Database Inti
+→ Laporan dan Audit Trail
+Data mentah di staging, hasil normalisasi, hasil validasi, dan keputusan deduplikasi harus tetap disimpan agar dapat diaudit.
+Tabel kontrol upload
+UploadBatch
+Tabel ini mencatat satu aktivitas upload file.
+UploadBatchID
+UploadType
+OriginalFileName
+FileContentHash
+UploadedBy
+UploadedAt
+TotalRows
+NewRows
+DuplicateRows
+ChangedRows
+RejectedRows
+ProcessingStatus
+ProcessedAt
+ApprovedBy
+ApprovedAt
+Remarks
+Definisi kolom UploadBatch
+Kolom | Keterangan
+UploadBatchID | ID unik batch upload yang dibuat otomatis
+UploadType | Jenis data: Agent, Production, atau Claim
+OriginalFileName | Nama file asli untuk kebutuhan audit
+FileContentHash | Hash keseluruhan isi file untuk deteksi file identik
+UploadedBy | User yang melakukan upload
+UploadedAt | Waktu file diterima sistem
+TotalRows | Total baris yang dibaca dari file
+NewRows | Jumlah baris baru
+DuplicateRows | Jumlah baris identik yang sudah pernah diposting
+ChangedRows | Jumlah baris dengan identitas sama tetapi isi berubah
+RejectedRows | Jumlah baris gagal validasi
+ProcessingStatus | Status proses batch
+ProcessedAt | Waktu proses selesai
+ApprovedBy | User approver jika approval diwajibkan
+ApprovedAt | Waktu approval
+Remarks | Catatan tambahan
+
+UploadRow
+Tabel ini mencatat hasil pemeriksaan setiap baris.
+UploadRowID
+UploadBatchID
+SourceRowNumber
+BusinessKey
+SourceRowHash
+ValidationStatus
+ValidationMessage
+DuplicateOfRecordID
+PostedRecordID
+RawPayload
+CreatedAt
+Status baris upload
+Status | Makna
+New | Data baru dan dapat diposting
+Duplicate | Data identik dengan data yang sudah pernah diposting
+Changed | Business key sama tetapi isi data berubah
+Rejected | Data gagal validasi
+Pending Mapping | Data menunggu mapping agent, produk, cabang, atau referensi lain
+Posted | Data berhasil masuk ke tabel inti
+
+Aturan nama file
+Nama file hanya disimpan sebagai informasi audit.
+Nama file tidak boleh digunakan untuk menentukan apakah data baru atau duplikat, karena file dapat memakai nama sama dengan isi berbeda.
+Contoh:
+Nama file: PRODUKSI.xlsx
+Upload 1: berisi 500 polis
+Upload 2: berisi 550 polis
+Upload 3: berisi data yang sama persis dengan Upload 2
+Perlakuan:
+Upload 1 diproses sebagai data baru.
+Upload 2 diproses; baris lama yang identik menjadi Duplicate, baris tambahan menjadi New, dan perubahan menjadi Changed.
+Upload 3 terdeteksi sebagai file identik melalui FileContentHash; sistem dapat memberi peringatan, tetapi pemeriksaan per baris tetap menjadi dasar keputusan akhir.
+Normalisasi data
+Sebelum validasi dan pembentukan hash, sistem harus melakukan normalisasi.
+Jenis data | Aturan normalisasi
+Kode dan teks | Trim spasi, hilangkan spasi ganda, konsistenkan huruf kapital
+Nomor polis/claim/agent | Trim spasi dan normalisasi kapitalisasi
+Tanggal | Konversi ke format standar ISO YYYY-MM-DD
+Nominal | Ubah ke decimal standar, hapus pemisah ribuan, validasi angka
+Currency | Normalisasi ke kode currency resmi, misalnya IDR, USD
+Nilai kosong | Gunakan representasi null yang konsisten
+Produk/cabang | Validasi terhadap master mapping yang disetujui
+
+Contoh:
+" POL-001 " → "POL-001"
+"pol-001" → "POL-001"
+"1,000,000" → 1000000.00
+"01/02/2026" → 2026-02-01
+"idr" → "IDR"
+Format tanggal ambigu harus ditolak atau ditentukan melalui konfigurasi template sumber.
+Aturan hash
+Hash dibuat setelah seluruh nilai dinormalisasi. Implementasi disarankan memakai SHA-256 dengan canonical serialization dan pemisah kolom yang aman.
+Hash produksi
+SourceRowHash =
+HASH(
+PolicyNo +
+PolicyRiskID +
+EffectiveDate +
+TransactionType +
+Product +
+Coverage +
+TSI +
+Premium +
+Currency
+)
+Hash settlement klaim
+ClaimSettlementRowHash =
+HASH(
+ClaimNo +
+PolicyNo +
+SettlementDate +
+Currency +
+GrossClaim +
+Indemnity +
+Deductible +
+Salvage +
+Subrogation
+)
+Daftar kolom pembentuk hash harus memiliki versi konfigurasi agar perubahan aturan hash dapat ditelusuri.
+Master Agent
+Tabel MasterAgent
+AgentIDInternal
+KODEAGEN
+AgentIDSource
+NamaAgent
+Cabang
+StatusAgent
+SourceRowHash
+UploadBatchID
+IsCurrent
+CreatedAt
+CreatedBy
+UpdatedAt
+UpdatedBy
+Aturan Agent
+KODEAGEN atau Agent ID dari sumber menjadi business key agent.
+AgentIDInternal dibuat otomatis sebagai primary key aplikasi.
+Produksi dan claim harus menggunakan AgentIDInternal sebagai foreign key setelah mapping valid.
+Baris agent yang identik tidak membuat agent baru.
+Perubahan nama, cabang, atau status agent diproses sebagai perubahan master/histori.
+Jika agent pada produksi atau claim belum ditemukan, transaksi dapat menjadi Pending Mapping atau Rejected, sesuai konfigurasi operasional.
+Data Produksi
+Tabel MasterProduksi
+ProductionID
+AgentIDInternal
+PolicyNo
+PolicyRiskID
+TransactionDate
+EffectiveDate
+ExpiryDate
+TransactionType
+Product
+Coverage
+VehicleOrRiskDescription
+TSI
+Premium
+Currency
+BusinessKey
+SourceRowHash
+UploadBatchID
+VersionNo
+PreviousRecordID
+IsCurrent
+ValidationStatus
+CreatedAt
+CreatedBy
+UpdatedAt
+UpdatedBy
+Kolom sumber yang tersedia harus tetap disimpan sesuai nama dan makna bisnis file sumber yang disetujui.
+Business key produksi
+Business key minimum:
+Policy No + PolicyRiskID + Effective Date + Transaction Type
+Jika PolicyRiskID tidak tersedia, perusahaan harus menyetujui penggantinya. Policy No saja dapat tidak cukup karena satu polis dapat memiliki lebih dari satu objek risiko.
+Aturan deduplikasi produksi
+Kondisi | Perlakuan
+SourceRowHash pernah diposting | Duplicate; tidak membuat transaksi produksi baru
+Business key baru | New; diposting sebagai transaksi/versi baru
+Business key sama, data identik | Duplicate
+Business key sama, premi/TSI/produk/coverage berubah | Changed; dibuat versi atau endorsement baru
+Data wajib kosong atau format salah | Rejected
+Agent belum termapping | Pending Mapping atau Rejected
+
+Aturan histori produksi
+Perubahan premi, TSI, kendaraan, produk, coverage, atau atribut risiko tidak boleh menghapus histori lama.
+Record baru harus memiliki VersionNo berikutnya.
+Record versi sebelumnya harus dihubungkan melalui PreviousRecordID.
+Posisi polis terkini menggunakan IsCurrent = True.
+Hanya satu record aktif untuk satu business key posisi, kecuali aturan bisnis menyatakan sebaliknya.
+Laporan produksi periode menggunakan transaksi valid atau delta, bukan penjumlahan seluruh versi.
+Endorsement dan perubahan
+Untuk setiap perubahan produksi, sistem harus mengklasifikasikan jenis transaksi, misalnya:
+New Business
+Renewal
+Endorsement Increase
+Endorsement Decrease
+Cancellation
+Refund
+Reinstatement
+Correction
+Definisi dampak premi dan TSI untuk setiap jenis transaksi harus disetujui oleh Underwriting dan Finance sebelum go-live.
+Data Claim Settled
+Prinsip klaim
+Satu polis dapat memiliki banyak claim.
+Satu claim dapat memiliki banyak settlement.
+Policy No bukan identitas unik klaim.
+Claim No adalah identitas utama klaim jika unik secara global.
+Jika Claim No tidak unik secara global, gunakan kombinasi Claim No + Policy No + Agent ID.
+Jika sumber memiliki Settlement No atau Payment No, gunakan sebagai identitas tambahan settlement.
+Tabel ClaimMaster
+ClaimID
+AgentIDInternal
+ClaimNo
+PolicyNo
+PolicyRiskID
+UWYear
+Branch
+ProductName
+ProductAtLoss
+CoverageAtLoss
+TSIAtLoss
+Currency
+CauseOfLoss
+LossDate
+ClaimStatus
+UploadBatchID
+CreatedAt
+CreatedBy
+UpdatedAt
+UpdatedBy
+Tabel ClaimSettlement
+ClaimSettlementID
+ClaimID
+SettlementNo
+DateOfSettlement
+GrossClaim
+Indemnity
+Deductible
+Salvage
+Subrogation
+Currency
+SourceRowHash
+UploadBatchID
+ValidationStatus
+CreatedAt
+CreatedBy
+UpdatedAt
+UpdatedBy
+Aturan deduplikasi klaim
+Kondisi | Perlakuan
+Settlement hash sama pernah diposting | Duplicate; tidak dijumlahkan ulang
+Claim No baru | New; buat ClaimMaster dan ClaimSettlement
+Claim No sama, settlement date atau nominal berbeda | Settlement tambahan atau koreksi
+Policy No sama, Claim No berbeda | Klaim berbeda; seluruhnya dihitung
+Claim No kosong | Rejected
+Settlement date kosong/tidak valid | Rejected
+Currency kosong atau tidak valid | Rejected
+
+Aturan claim settled
+Semua settlement valid harus disimpan.
+Semua claim unik harus dihitung dalam laporan jumlah claim.
+Jangan mengambil hanya claim paling akhir pada satu polis.
+Date Of Settlement digunakan untuk laporan settled claim per periode.
+UW Year digunakan untuk analisis underwriting year.
+Produk, coverage, dan TSI pada claim idealnya merepresentasikan kondisi saat loss, bukan kondisi polis yang berubah setelahnya.
+Jika kolom kondisi saat loss tidak tersedia, aplikasi hanya menggunakan hubungan administratif melalui Policy No.
+Nilai klaim dan rumus
+Nilai berikut harus disimpan sesuai nilai sumber:
+Gross Claim
+Indemnity
+Deductible
+Salvage
+Subrogation
+Currency
+Metrik laporan
+Total Gross Claim = SUM(GrossClaim)
+Total Indemnity = SUM(Indemnity)
+Total Deductible = SUM(Deductible)
+Total Salvage = SUM(Salvage)
+Total Subrogation = SUM(Subrogation)
+Rumus Net Claims Cost tidak boleh langsung diasumsikan. Contoh rumus berikut hanya dapat digunakan setelah disetujui Finance dan Claims:
+Net Claims Cost =
+Indemnity + Deductible - Salvage - Subrogation
+Apabila Indemnity sudah net setelah deductible, maka deductible tidak boleh kembali dikurangkan atau ditambahkan tanpa definisi resmi.
+Aturan mata uang
+Laporan harus mengelompokkan nominal berdasarkan Currency.
+Nilai IDR dan USD tidak boleh dijumlahkan langsung.
+Jika diperlukan laporan dalam satu mata uang, sistem harus menggunakan tabel kurs resmi.
+Tabel kurs minimal harus memiliki:
+ExchangeRateID
+RateDate
+FromCurrency
+ToCurrency
+RateType
+ExchangeRate
+ApprovedBy
+ApprovedAt
+Laporan hasil konversi harus menampilkan mata uang asal, kurs yang digunakan, tanggal kurs, dan metode kurs.
+Proses upload
+Tahapan upload
+User memilih jenis upload: Agent, Production, atau Claim.
+Sistem membuat UploadBatchID.
+Sistem menyimpan metadata file dan menghitung FileContentHash.
+Sistem membaca data ke staging.
+Sistem memvalidasi template dan kolom wajib.
+Sistem melakukan normalisasi data.
+Sistem membentuk BusinessKey dan SourceRowHash.
+Sistem memvalidasi referensi master, termasuk agent, cabang, produk, dan currency.
+Sistem mengklasifikasikan setiap baris sebagai New, Duplicate, Changed, Rejected, atau Pending Mapping.
+Sistem menampilkan ringkasan hasil upload.
+User berwenang melakukan review atau approval jika diperlukan.
+Sistem memposting data valid ke tabel inti.
+Sistem menyimpan hasil final ke UploadBatch dan UploadRow.
+Ringkasan hasil upload
+Sistem minimal harus menampilkan:
+Total Rows
+New Rows
+Duplicate Rows
+Changed Rows
+Rejected Rows
+Pending Mapping Rows
+Posted Rows
+Sistem juga harus menyediakan unduhan daftar error atau hasil validasi per baris.
+Status batch upload
+Status | Keterangan
+Uploaded | File telah diterima
+Validating | Sistem sedang memproses validasi dan deduplikasi
+Ready for Review | Validasi selesai dan menunggu review
+Approved | Batch disetujui untuk posting
+Posted | Data valid telah diposting
+Posted with Exceptions | Sebagian data diposting, sebagian duplicate/rejected
+Failed | Proses teknis gagal
+Rejected | Batch ditolak dan tidak diposting
+Cancelled | Batch dibatalkan oleh user berwenang
+
+Aturan laporan
+Produksi periode
+Dasar perhitungan:
+Transaksi produksi valid atau delta valid
+berdasarkan Transaction Date atau Effective Date
+sesuai definisi laporan
+Laporan ini tidak boleh menjumlahkan seluruh versi produksi karena dapat menggandakan premi atau TSI.
+Posisi polis terkini
+Dasar perhitungan:
+MasterProduksi
+WHERE IsCurrent = True
+Posisi harus mengikuti definisi unit laporan yang disetujui:
+Policy
+Policy Risk
+Certificate
+Object of Risk
+Jumlah polis
+Contoh:
+COUNT(DISTINCT PolicyNo)
+Apabila laporan berbasis risiko:
+COUNT(DISTINCT PolicyNo + PolicyRiskID)
+Basis perhitungan harus selalu ditampilkan di header laporan.
+Claim settled per periode
+WHERE DateOfSettlement BETWEEN PeriodStart AND PeriodEnd
+Jumlah claim
+COUNT(DISTINCT ClaimNo)
+Atau:
+COUNT(DISTINCT ClaimID)
+Pemilihan antara ClaimNo dan ClaimID mengikuti keputusan apakah Claim No unik secara global.
+Claim per polis
+GROUP BY PolicyNo
+COUNT(DISTINCT ClaimNo)
+Claim per underwriting year
+GROUP BY UWYear
+UW Year harus tetap dipisahkan dari tahun settlement.
+Laporan minimal
+Laporan | Dimensi/filter minimum
+Ringkasan produksi | Periode, agent, cabang, produk, currency, jenis transaksi
+Posisi polis terkini | Agent, cabang, produk, coverage, currency
+Produksi per agent | Agent, periode, produk, currency
+Produksi per cabang | Cabang, periode, produk, currency
+Settled claim | Settlement date, agent, cabang, produk, currency
+Claim per polis | Policy No, Claim No, settlement date
+Claim per UW Year | UW Year, produk, cabang, currency
+Cause of loss | Cause of loss, produk, cabang, periode settlement
+Recovery | Salvage, subrogation, settlement date, currency
+Audit upload | Batch, user, waktu upload, status, hasil per baris
+
+Keamanan dan audit
+Aplikasi harus menerapkan:
+Role-based access control.
+Hak akses upload berdasarkan jenis data.
+Hak akses laporan berdasarkan peran, cabang, atau wilayah bila diperlukan.
+Audit trail untuk create, update, status change, approval, dan override.
+Larangan penghapusan fisik data posted melalui antarmuka aplikasi.
+Koreksi dilakukan melalui transaksi koreksi atau status pembatalan yang dapat diaudit.
+Penyimpanan file asli atau referensi file dalam repository terkelola.
+Checksum atau hash file untuk membuktikan integritas file.
+Pembatasan ekspor data claim sesuai otorisasi.
+Kolom audit minimum:
+CreatedAt
+CreatedBy
+UpdatedAt
+UpdatedBy
+ApprovedAt
+ApprovedBy
+CancelledAt
+CancelledBy
+CancellationReason
+Kriteria penerimaan
+Aplikasi dinyatakan memenuhi kebutuhan apabila seluruh skenario berikut berhasil.
+Skenario | Hasil yang diharapkan
+File dengan nama sama tetapi isi berbeda | Dapat diproses; data baru/perubahan dikenali
+File yang sama di-upload ulang | Tidak menambah data produksi atau claim
+File berisi data lama dan data baru | Data lama duplicate; data baru diposting
+Produksi dengan perubahan premi | Dibuat histori/versi atau endorsement
+Satu polis memiliki tiga claim | Ketiga claim tetap dihitung
+Satu claim memiliki dua settlement | Dua settlement disimpan jika valid
+Currency IDR dan USD | Tidak dijumlahkan langsung
+Agent belum ditemukan | Masuk Pending Mapping atau Rejected
+Data claim tanpa Claim No | Ditolak
+Data settlement tanpa tanggal settlement | Ditolak
+Laporan settled claim | Menggunakan Date Of Settlement
+Laporan UW Year | Menggunakan UW Year
+Audit angka laporan | Dapat ditelusuri ke ClaimSettlement/Production, UploadRow, dan UploadBatch
+
+Parameter yang harus dikonfirmasi sebelum go-live
+Aturan utama telah final, tetapi parameter berikut harus dikonfirmasi untuk menghindari asumsi implementasi:
+Daftar lengkap kolom baku file Agent, Produksi, dan Claim.
+Contoh file sumber aktual untuk setiap jenis upload.
+Apakah Claim No unik secara global.
+Apakah tersedia Settlement No atau Payment No.
+Apakah tersedia PolicyRiskID.
+Definisi resmi jenis transaksi produksi.
+Aturan delta untuk endorsement, cancellation, refund, dan reinstatement.
+Definisi resmi Gross Claim, Indemnity, Deductible, Salvage, dan Subrogation.
+Rumus resmi Net Claims Cost.
+Daftar master produk, cabang, currency, coverage, dan cause of loss.
+Format tanggal sumber dan penanganan tanggal ambigu.
+Approval workflow untuk batch dan koreksi.
+Retensi file, staging data, audit log, dan data transaksi.
+Metode kurs dan tanggal kurs apabila laporan lintas mata uang diperlukan.

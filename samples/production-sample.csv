@@ -1,0 +1,8 @@
+PolicyNo,PolicyRiskID,TransactionDate,EffectiveDate,ExpiryDate,TransactionType,Product,Coverage,VehicleOrRiskDescription,TSI,Premium,Currency,KodeAgen,Cabang
+POL-2026-0001,RISK-001,2026-01-20,2026-02-01,2027-02-01,New Business,MOTOR,COMP,"Toyota Avanza B 1234 XYZ - kendaraan operasional",150000000,3500000,IDR,AGT001,JKT
+POL-2026-0001,RISK-001,2026-09-25,2026-02-01,2027-02-01,New Business,MOTOR,COMP,"Toyota Avanza B 1234 XYZ - penyesuaian premi",150000000,4000000,IDR,AGT001,JKT
+POL-2026-0100,RISK-001,2026-03-05,2026-04-01,2027-04-01,New Business,FIRE,FIRE_ALL,"Gudang distribusi Cikarang - Jl. Industri 12",75000000,1250000,IDR,AGT002,BDG
+POL-2026-0101,RISK-001,2026-03-10,2026-03-15,2027-03-15,New Business,MOTOR,TLO,"Mitsubishi L300 B 8899 KL - armada logistik",200000000,2000000,IDR,AGT003,SBY
+POL-2026-0102,RISK-001,2026-03-12,2026-05-01,2027-05-01,New Business,MARINE,CARGO,"Marine cargo Jakarta - Singapore, 20 kontainer",50000,1200,USD,AGT004,MDN
+POL-2026-0100,RISK-001,2026-09-20,2026-10-01,2027-04-01,Endorsement Increase,FIRE,FIRE_ALL,"Gudang distribusi Cikarang - penambahan TSI",90000000,1500000,IDR,AGT002,BDG
+POL-2026-0103,RISK-001,2026-03-15,2026-02-31,2027-02-28,New Business,MOTOR,COMP,"Unit dengan tanggal efektif tidak valid",100000000,1800000,IDR,AGT005,MKS
