@@ -14,7 +14,7 @@
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
     "reset": "node db/reset.js",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "test:acceptance": "node --test test/acceptance.test.js",
     "test:api": "node --test test/api.test.js",
     "test:ui": "node --test test/ui-smoke.test.js"
