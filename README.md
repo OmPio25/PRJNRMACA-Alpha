@@ -30,18 +30,20 @@ Dokumen teknis:
 
 ## Menjalankan
 
-Prasyarat: **Node.js ≥ 22.5** (memakai `node:sqlite` bawaan; diuji pada Node 26) dan npm.
+Prasyarat: **Node.js ≥ 22.5** (memakai `node:sqlite` bawaan; diuji pada Node 22, 24, dan 26)
+dan npm.
+
+Seluruh perintah dijalankan dari **root repository** ini (tidak ada subfolder `app/`):
 
 ```bash
-cd app
-npm install
+npm ci            # atau: npm install
 npm run reset     # buat schema + data demo dari nol
 npm start         # http://localhost:3000
 ```
 
 `npm run reset` menghapus database dan file upload lama, menjalankan migrasi, lalu mengisi
 data demo. Untuk instalasi yang sudah ada, `npm run migrate` dan `npm run seed` bersifat
-idempoten.
+idempoten (`npm run seed` otomatis menjalankan migrasi bila skema belum ada).
 
 Konfigurasi lewat environment variable (tanpa file `.env`):
 
@@ -149,7 +151,7 @@ Hasil saat ini: **44 test lulus, 0 gagal**.
 ## Struktur proyek
 
 ```
-app/
+PRJNRMACA-Alpha/  (root repository = root aplikasi)
 ├─ db/            schema.sql, koneksi, migrasi, seed, reset
 ├─ src/server/    app Express, middleware, routes, services, util
 ├─ public/        SPA: index.html, css/app.css, js/{api,ui,app}.js, js/pages/*.js

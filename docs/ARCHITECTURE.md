@@ -16,12 +16,14 @@ Aplikasi upload, pengelolaan, dan pelaporan Data Agent, Produksi, dan Claim Sett
 | Password | `scrypt` (`node:crypto`) | Bawaan Node, tanpa dependensi |
 | Test | `node:test` + `node:assert` | Bawaan Node |
 
-Tidak ada build step. Persyaratan menjalankan: `npm install && npm run seed && npm start`.
+Tidak ada build step. Persyaratan menjalankan (dari root repository):
+`npm ci && npm run reset && npm start`. Untuk instalasi yang sudah ada, `npm run migrate`
+dan `npm run seed` bersifat idempoten.
 
 ## 2. Struktur folder dan kepemilikan file
 
 ```
-app/
+PRJNRMACA-Alpha/  (root repository = root aplikasi)
 ├─ package.json                  Tech Lead
 ├─ README.md                     Tech Lead
 ├─ docs/                         ARCHITECTURE (TL), DATA_MODEL (DB), API_CONTRACT (TL), DESIGN_SPEC (UI/UX)
